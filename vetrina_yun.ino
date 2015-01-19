@@ -1,4 +1,8 @@
+//  control radio 220V. plugs, modified for Arduino
+
 //  derived from: http://arduino.cc/en/Guide/ArduinoYun#toc19
+
+//  include Fastled library Cylon example
 
 
 /*
@@ -11,6 +15,11 @@
  calls through the browser.
 
  Possible commands created in this shetch:
+ 
+ *Me-> "http://vetrine.local/arduino/neo/2"    -> 4 = numero delle reiterazioni
+
+ *Me-> "http://vetrine.local/arduino/luce/4"   -> D-On
+ *Me-> "http://vetrine.local/arduino/luce/11"  -> D-Off
 
  * "/arduino/digital/13"     -> digitalRead(13)
  * "/arduino/digital/13/1"   -> digitalWrite(13, HIGH)
@@ -29,20 +38,46 @@
 #include <YunServer.h>
 #include <YunClient.h>
 
+#include "FastLED.h"
+
+#define switchPin1 4     // D-On
+#define switchPin2 5     // C-On
+#define switchPin3 6     // B-On
+#define switchPin4 7     // A-On
+
+#define switchPin5 8     // A-Off
+#define switchPin6 9     // B-Off
+#define switchPin7 10    // C-Off
+#define switchPin8 11    // D-Off
+
+// How many leds in your strip?
+#define NUM_LEDS 12
+
+// For led chips like Neopixels, which have a data line, ground, and power, you just
+// need to define DATA_PIN.  For led chipsets that are SPI based (four wires - data, clock,
+// ground, and power), like the LPD8806, define both DATA_PIN and CLOCK_PIN
+#define DATA_PIN 3
+//  #define CLOCK_PIN 13
+
+// Define the array of leds
+CRGB leds[NUM_LEDS];
+
+
 // Listen on default port 5555, the webserver on the Yún
 // will forward there all the HTTP requests for us.
 YunServer server;
 
 void setup() {
-  
+  pinMode(switchPin1, OUTPUT);
+  pinMode(switchPin2, OUTPUT);
+  pinMode(switchPin3, OUTPUT);
+  pinMode(switchPin4, OUTPUT);
+  pinMode(switchPin5, OUTPUT);
+  pinMode(switchPin6, OUTPUT);
+  pinMode(switchPin7, OUTPUT);
+  pinMode(switchPin8, OUTPUT);
+
   Serial.begin(9600);
-  for (int i=4; i <= 12; i++){
-    pinMode(i, OUTPUT);      // sets the digital pin as output
-    
-    Serial.print(i);
-    Serial.print(", ");
-  }
-  Serial.println("");
   
   // Bridge startup
   pinMode(13, OUTPUT);
@@ -54,6 +89,9 @@ void setup() {
   // (no one from the external network could connect)
   server.listenOnLocalhost();
   server.begin();
+  
+  	FastLED.addLeds<NEOPIXEL,DATA_PIN>(leds, NUM_LEDS);
+
 }
 
 void loop() {
@@ -76,6 +114,12 @@ void process(YunClient client) {
   // read the command
   String command = client.readStringUntil('/');
 
+  // is "neo" command?
+  if (command == "neo") {
+      client.print(F("neo"));
+      neoCommand(client);
+  }
+
   // is "luce" command?
   if (command == "luce") {
     luceCommand(client);
@@ -97,14 +141,71 @@ void process(YunClient client) {
   }
 }
 
+
+
+void cylon() { 
+          Serial.print(F("CYLON"));
+
+	// First slide the led in one direction
+	for(int i = 0; i < NUM_LEDS; i++) {
+		// Set the i'th led to red 
+		leds[i] = CRGB::Red;
+		// Show the leds
+		FastLED.show();
+		// now that we've shown the leds, reset the i'th led to black
+		leds[i] = CRGB::Black;
+		// Wait a little bit before we loop around and do it again
+		delay(100);
+	}
+
+	// Now go in the other direction.  
+	for(int i = NUM_LEDS-1; i >= 0; i--) {
+		// Set the i'th led to red 
+		leds[i] = CRGB::Red;
+		// Show the leds
+		FastLED.show();
+		// now that we've shown the leds, reset the i'th led to black
+		leds[i] = CRGB::Black;
+		// Wait a little bit before we loop around and do it again
+		delay(100);
+	}
+}
+
+
+void neoCommand(YunClient client) {
+  int upto;
+
+  // Read pin number
+  upto = client.parseInt();
+
+    for(int i = 0; i < upto; i++) {
+    cylon();
+      
+//    client.print(F("neo"));
+//    client.print(upto);
+
+    delay(1000);
+ 
+   }
+ 
+  // Send feedback to client
+  client.print(F("Neopixel"));
+  
+  // Update datastore key with the current pin value
+  String key = "N";
+  key += 1;
+  Bridge.put(key, String(HIGH));
+}
+
+
 void luceCommand(YunClient client) {
   int pin;
 
   // Read pin number
   pin = client.parseInt();
-  digitalWrite(pin, 1);
+  digitalWrite(pin, HIGH);
   delay(1000);
-  digitalWrite(pin, 0);
+  digitalWrite(pin, LOW);
 
   // Send feedback to client
   client.print(F("Pin Luce "));
@@ -113,7 +214,7 @@ void luceCommand(YunClient client) {
   // Update datastore key with the current pin value
   String key = "L";
   key += pin;
-  Bridge.put(key, String(1));
+  Bridge.put(key, String(HIGH));
 }
 
 
